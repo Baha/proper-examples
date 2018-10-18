@@ -1,0 +1,266 @@
+-file("mytrees.erl", 1).
+
+-module(mytrees).
+
+-export([prop_delete/0,prop_sum/0]).
+
+-export([tree1/1,tree2/1,tree3/1,tree4/1,tree5/1,tree/1]).
+
+-export([member/2,join/2,delete/2,tree_sum/1,preorder/1]).
+
+-file("/Users/baha/proper-1.3/include/proper.hrl", 1).
+
+-compile(debug_info).
+
+-file("/Users/baha/proper-1.3/include/proper_common.hrl", 1).
+
+-file("/Users/baha/proper-1.3/include/proper.hrl", 32).
+
+-import(proper, [numtests/2,fails/1,on_output/2,conjunction/1]).
+
+-import(proper,
+        [collect/2,
+         collect/3,
+         aggregate/2,
+         aggregate/3,
+         classify/3,
+         measure/3,
+         with_title/1,
+         equals/2]).
+
+-import(proper_types,
+        [integer/2,
+         float/2,
+         atom/0,
+         binary/0,
+         binary/1,
+         bitstring/0,
+         bitstring/1,
+         list/1,
+         vector/2,
+         union/1,
+         weighted_union/1,
+         tuple/1,
+         loose_tuple/1,
+         exactly/1,
+         fixed_list/1,
+         function/2,
+         map/2,
+         any/0]).
+
+-import(proper_types,
+        [integer/0,
+         non_neg_integer/0,
+         pos_integer/0,
+         neg_integer/0,
+         range/2,
+         float/0,
+         non_neg_float/0,
+         number/0,
+         boolean/0,
+         byte/0,
+         char/0,
+         list/0,
+         tuple/0,
+         string/0,
+         wunion/1,
+         term/0,
+         timeout/0,
+         arity/0]).
+
+-import(proper_types,
+        [int/0,
+         nat/0,
+         largeint/0,
+         real/0,
+         bool/0,
+         choose/2,
+         elements/1,
+         oneof/1,
+         frequency/1,
+         return/1,
+         default/2,
+         orderedlist/1,
+         function0/1,
+         function1/1,
+         function2/1,
+         function3/1,
+         function4/1,
+         weighted_default/2,
+         parameter/1,
+         parameter/2,
+         with_parameter/3,
+         with_parameters/2]).
+
+-import(proper_unicode, [utf8/0,utf8/1,utf8/2]).
+
+-import(proper_types, [resize/2,non_empty/1,noshrink/1]).
+
+-import(proper_symb,
+        [eval/1,
+         eval/2,
+         defined/1,
+         well_defined/1,
+         pretty_print/1,
+         pretty_print/2]).
+
+-import(proper_statem,
+        [commands/1,
+         commands/2,
+         parallel_commands/1,
+         parallel_commands/2,
+         more_commands/2]).
+
+-import(proper_statem,
+        [run_commands/2,
+         run_commands/3,
+         state_after/2,
+         command_names/1,
+         zip/2,
+         run_parallel_commands/2,
+         run_parallel_commands/3]).
+
+-import(proper_unused_imports_remover, []).
+
+-file("mytrees.erl", 8).
+
+-type tree(T) :: leaf | {node, T, tree(T), tree(T)}.
+
+-spec member(T, tree(T)) -> boolean().
+
+member(_, leaf) ->
+    false;
+member(X, {node,X,_,_}) ->
+    true;
+member(X, {node,_,L,R}) ->
+    member(X, L)
+    orelse
+    member(X, R).
+
+-spec join(tree(T), tree(T)) -> tree(T).
+
+join(leaf, T2) ->
+    T2;
+join({node,X1,L1,R1}, T2) ->
+    {node,X1,join(L1, R1),T2}.
+
+-spec delete(T, tree(T)) -> tree(T).
+
+delete(_, leaf) ->
+    leaf;
+delete(X, {node,X,L,R}) ->
+    join(L, R);
+delete(X, {node,Y,L,R}) ->
+    {node,Y,delete(X, L),delete(X, R)}.
+
+-spec tree_sum(tree(number())) -> number().
+
+tree_sum(leaf) ->
+    0;
+tree_sum({node,X,L,R}) ->
+    tree_sum(L) + tree_sum(R) + X.
+
+-spec preorder(tree(T)) -> [T].
+
+preorder(leaf) ->
+    [];
+preorder({node,X,L,R}) ->
+    [X] ++ preorder(L) ++ preorder(R).
+
+prop_delete() ->
+    proper:forall({integer(),tree(integer())},
+                  fun({X,T}) ->
+                         not member(X, delete(X, T))
+                  end).
+
+prop_sum() ->
+    proper:forall(tree(integer()),
+                  fun(T) ->
+                         lists:sum(preorder(T)) =:= tree_sum(T)
+                  end).
+
+tree1(G) ->
+    union([leaf,{node,G,tree1(G),tree1(G)}]).
+
+tree2(G) ->
+    union([leaf,
+           proper_types:lazy(fun() ->
+                                    {node,G,tree2(G),tree2(G)}
+                             end)]).
+
+tree3(G) ->
+    proper_types:sized(fun(S) ->
+                              tree3(S, G)
+                       end).
+
+tree3(0, _) ->
+    leaf;
+tree3(S, G) ->
+    union([tree3(0, G),
+           proper_types:lazy(fun() ->
+                                    {node,
+                                     G,
+                                     tree3(S - 1, G),
+                                     tree3(S - 1, G)}
+                             end)]).
+
+tree4(G) ->
+    proper_types:sized(fun(S) ->
+                              tree4(S, G)
+                       end).
+
+tree4(0, _) ->
+    leaf;
+tree4(S, G) ->
+    frequency([{1,tree4(0, G)},
+               {9,
+                proper_types:lazy(fun() ->
+                                         {node,
+                                          G,
+                                          tree4(S - 1, G),
+                                          tree4(S - 1, G)}
+                                  end)}]).
+
+tree5(G) ->
+    proper_types:sized(fun(S) ->
+                              tree5(S, G)
+                       end).
+
+tree5(0, _) ->
+    leaf;
+tree5(S, G) ->
+    frequency([{1,tree5(0, G)},
+               {9,
+                proper_types:lazy(fun() ->
+                                         {node,
+                                          G,
+                                          tree5(S div 2, G),
+                                          tree5(S div 2, G)}
+                                  end)}]).
+
+tree(G) ->
+    proper_types:sized(fun(S) ->
+                              tree(S, G)
+                       end).
+
+tree(0, _) ->
+    leaf;
+tree(S, G) ->
+    frequency([{1,tree(0, G)},
+               {9,
+                proper_types:lazy(fun() ->
+                                         proper_types:bind([tree(S div 2,
+                                                                 G),
+                                                            tree(S div 2,
+                                                                 G)],
+                                                           fun([L,R]) ->
+                                                                  {node,
+                                                                   G,
+                                                                   L,
+                                                                   R}
+                                                           end,
+                                                           true)
+                                  end)}]).
+
+
+
